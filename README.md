@@ -15,7 +15,9 @@ entirely in the browser tab.
   on plain UDP for LAN and split-horizon domains.
 - **Fail-closed routing**: `route.final` is your proxy outbound. Only private
   IPs and the `geosite-private` rule-set go direct — everything else is
-  tunneled or dropped, never silently sent out in the clear.
+  tunneled or dropped, never silently sent out in the clear. `geosite-private`
+  defaults to a local file at `C:\sing-box\geosite-private.srs`; switch the
+  dropdown to auto-download if you'd rather not manage that file yourself.
 - **Leak-path closers** (toggleable): reject UDP/443 (QUIC) so HTTP/3 can't
   route around a TCP-only path, and reject IPv6 since the TUN address here is
   IPv4-only.
@@ -23,6 +25,11 @@ entirely in the browser tab.
   transports (`tcp`, `ws` incl. early-data, `grpc`, `http`, `httpupgrade`),
   uTLS fingerprint, ALPN, Reality `pbk`/`sid`. Multiple links generate a
   `selector` outbound so you can flip between servers.
+- **Bypass domains**: a plain list of domains that should skip the proxy —
+  applied to both DNS resolution and routing, evaluated before
+  `geosite-private`. One per line; a bare domain matches itself and its
+  subdomains, a leading `.` matches subdomains only, and `keyword:`/`regex:`
+  prefixes give substring/regex matching.
 
 ## Run it locally
 

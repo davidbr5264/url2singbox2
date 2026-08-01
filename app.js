@@ -173,11 +173,49 @@ function sanitizeTag(name, index) {
 }
 
 // ============================================================
+// BYPASS DOMAIN PARSING
+// One line per rule. Prefixes: "regex:", "keyword:". A leading "."
+// keeps sing-box's literal-suffix behavior (subdomains only); a bare
+// domain matches the domain itself and all subdomains (sing-box >=1.9).
+// ============================================================
+function parseBypassDomains(text) {
+  const domain_suffix = [];
+  const domain_keyword = [];
+  const domain_regex = [];
+  const warnings = [];
+
+  text.split("\n").forEach(raw => {
+    const line = raw.trim();
+    if (!line || line.startsWith("#")) return;
+
+    if (line.toLowerCase().startsWith("regex:")) {
+      const pattern = line.slice(6).trim();
+      try { new RegExp(pattern); domain_regex.push(pattern); }
+      catch { warnings.push(`Bypass rule "${line}" isn't a valid regular expression — skipped.`); }
+    } else if (line.toLowerCase().startsWith("keyword:")) {
+      const kw = line.slice(8).trim();
+      if (kw) domain_keyword.push(kw); else warnings.push(`Empty keyword rule — skipped.`);
+    } else {
+      domain_suffix.push(line);
+    }
+  });
+
+  return { domain_suffix, domain_keyword, domain_regex, warnings };
+}
+
+// ============================================================
 // CONFIG BUILDER
 // ============================================================
 function buildConfig(entries, opts) {
   const okEntries = entries.filter(e => e.ok);
   const outbounds = okEntries.map(e => e.outbound);
+
+  const bypass = opts.bypass || { domain_suffix: [], domain_keyword: [], domain_regex: [] };
+  const hasBypass = bypass.domain_suffix.length || bypass.domain_keyword.length || bypass.domain_regex.length;
+  const bypassFields = {};
+  if (bypass.domain_suffix.length) bypassFields.domain_suffix = bypass.domain_suffix;
+  if (bypass.domain_keyword.length) bypassFields.domain_keyword = bypass.domain_keyword;
+  if (bypass.domain_regex.length) bypassFields.domain_regex = bypass.domain_regex;
 
   // dedupe tags
   const seen = new Map();
@@ -233,6 +271,9 @@ function buildConfig(entries, opts) {
   ];
   if (localDnsServer) dnsRules.push({ server: "direct_dns", clash_mode: "Direct" });
   dnsRules.push({ action: "predefined", rcode: "NOERROR", query_type: [64, 65] });
+  if (hasBypass) {
+    dnsRules.push({ server: localDnsServer ? "direct_dns" : "remote_dns", ...bypassFields });
+  }
   dnsRules.push({ server: localDnsServer ? "direct_dns" : "remote_dns", rule_set: ["geosite-private"] });
 
   const dns = {
@@ -310,6 +351,9 @@ function buildConfig(entries, opts) {
     routeRules.push({ ip_version: 6, action: "reject" });
   }
   routeRules.push({ outbound: "direct", ip_is_private: true });
+  if (hasBypass) {
+    routeRules.push({ outbound: "direct", ...bypassFields });
+  }
   routeRules.push({ outbound: "direct", rule_set: ["geosite-private"] });
   routeRules.push({ outbound: proxyTag, port_range: ["0:65535"] });
 
@@ -401,6 +445,7 @@ const optionEls = {
   ruleSetPath: document.getElementById("optRuleSetPath"),
   logLevel: document.getElementById("optLogLevel"),
   cacheFile: document.getElementById("optCacheFile"),
+  bypassDomains: document.getElementById("optBypassDomains"),
 };
 
 function readOptions() {
@@ -422,7 +467,7 @@ function readOptions() {
     clashPort: parseInt(optionEls.clashPort.value, 10) || 10814,
     clashSecret: optionEls.clashSecret.value.trim(),
     ruleSetMode: optionEls.ruleSetMode.value,
-    ruleSetPath: optionEls.ruleSetPath.value.trim() || "C:\\sing-box\\srss\\geosite-private.srs",
+    ruleSetPath: optionEls.ruleSetPath.value.trim() || "C:\\sing-box\\geosite-private.srs",
     logLevel: optionEls.logLevel.value,
     cacheFile: optionEls.cacheFile.checked,
   };
@@ -557,6 +602,9 @@ function regenerate() {
   }
 
   const opts = readOptions();
+  const bypass = parseBypassDomains(optionEls.bypassDomains.value);
+  bypass.warnings.forEach(w => allWarnings.push(w));
+  opts.bypass = bypass;
   const config = buildConfig(entries, opts);
   lastConfig = config;
 
@@ -620,4 +668,4 @@ els.downloadBtn.addEventListener("click", () => {
 // initial state
 optionEls.remoteDnsCustom.hidden = true;
 optionEls.localDnsCustom.hidden = true;
-optionEls.ruleSetPath.hidden = true;
+optionEls.ruleSetPath.hidden = optionEls.ruleSetMode.value !== "local";

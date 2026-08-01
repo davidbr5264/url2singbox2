@@ -199,12 +199,12 @@
           <label class="field">
             <span class="field-label">geosite-private rule-set source</span>
             <select id="optRuleSetMode">
-              <option value="remote" selected>Auto-download (SagerNet, recommended)</option>
-              <option value="local">Local file on disk</option>
+              <option value="remote">Auto-download (SagerNet, recommended)</option>
+              <option value="local" selected>Local file on disk</option>
             </select>
           </label>
           <input type="text" id="optRuleSetPath" class="field-sub"
-                 value="C:\\sing-box\\srss\\geosite-private.srs" hidden>
+                 value="C:\\sing-box\\geosite-private.srs">
 
           <label class="field">
             <span class="field-label">Log level</span>
@@ -220,6 +220,21 @@
             <input type="checkbox" id="optCacheFile" checked>
             <span class="toggle-track"><span class="toggle-thumb"></span></span>
             <span class="toggle-text">DNS cache file<small>persists fakeip/cache across restarts, kept next to config.json</small></span>
+          </label>
+        </fieldset>
+
+        <fieldset class="opt-group opt-group-wide">
+          <legend>Bypass domains <span class="legend-note">— sent direct, not through the proxy</span></legend>
+
+          <label class="field">
+            <span class="field-label">One per line. Matches the domain and its subdomains by default.</span>
+            <textarea id="optBypassDomains" class="bypass-input" rows="4" spellcheck="false"
+              placeholder="example.com&#10;.internal.corp.example&#10;keyword:analytics&#10;regex:^ads\."></textarea>
+            <span class="field-label field-label-hint">
+              Prefix a line with <code>.</code> to match subdomains only (not the bare domain) ·
+              <code>keyword:</code> for a substring match ·
+              <code>regex:</code> for a regular expression
+            </span>
           </label>
         </fieldset>
 
