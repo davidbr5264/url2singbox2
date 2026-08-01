@@ -268,14 +268,16 @@ function buildConfig(entries, opts) {
     hostsEntries[opts.remoteDnsCustom] = [];
   }
 
-  const localDnsServer = opts.localDns === "custom" ? opts.localDnsCustom
-    : opts.localDns === "system" ? null
+  const useSystemDns = opts.localDns === "system";
+  const localDnsIp = opts.localDns === "custom" ? opts.localDnsCustom
+    : useSystemDns ? null
     : opts.localDns;
+  const hasDirectResolver = useSystemDns || !!localDnsIp;
 
   const dnsServers = [];
 
-  if (localDnsServer) {
-    dnsServers.push({ server: localDnsServer, type: "udp", tag: "local_local" });
+  if (localDnsIp) {
+    dnsServers.push({ server: localDnsIp, type: "udp", tag: "local_local" });
   }
   dnsServers.push({
     server: remoteProvider.domain,
@@ -285,8 +287,13 @@ function buildConfig(entries, opts) {
     tag: "remote_dns",
     detour: proxyTag
   });
-  if (localDnsServer) {
-    dnsServers.push({ server: localDnsServer, domain_resolver: "local_local", type: "udp", tag: "direct_dns" });
+  if (useSystemDns) {
+    // Uses the OS's own resolver directly — matches what a browser would
+    // get with no proxy running at all, avoiding geo/anycast mismatches
+    // that a foreign DNS provider can cause for direct-routed domains.
+    dnsServers.push({ type: "local", tag: "direct_dns" });
+  } else if (localDnsIp) {
+    dnsServers.push({ server: localDnsIp, domain_resolver: "local_local", type: "udp", tag: "direct_dns" });
   }
   dnsServers.push({
     predefined: hostsEntries,
@@ -298,12 +305,12 @@ function buildConfig(entries, opts) {
     { server: "hosts_dns", ip_accept_any: true },
     { server: "remote_dns", clash_mode: "Global" }
   ];
-  if (localDnsServer) dnsRules.push({ server: "direct_dns", clash_mode: "Direct" });
+  if (hasDirectResolver) dnsRules.push({ server: "direct_dns", clash_mode: "Direct" });
   dnsRules.push({ action: "predefined", rcode: "NOERROR", query_type: [64, 65] });
   if (hasBypass) {
-    dnsRules.push({ server: localDnsServer ? "direct_dns" : "remote_dns", ...bypassFields });
+    dnsRules.push({ server: hasDirectResolver ? "direct_dns" : "remote_dns", ...bypassFields });
   }
-  dnsRules.push({ server: localDnsServer ? "direct_dns" : "remote_dns", rule_set: ["geosite-private"] });
+  dnsRules.push({ server: hasDirectResolver ? "direct_dns" : "remote_dns", rule_set: ["geosite-private"] });
 
   const dns = {
     servers: dnsServers,
@@ -387,7 +394,7 @@ function buildConfig(entries, opts) {
   routeRules.push({ outbound: proxyTag, port_range: ["0:65535"] });
 
   const route = {
-    default_domain_resolver: { server: localDnsServer ? "direct_dns" : "remote_dns" },
+    default_domain_resolver: { server: hasDirectResolver ? "direct_dns" : "remote_dns" },
     auto_detect_interface: true,
     rules: routeRules,
     rule_set: [ruleSet],

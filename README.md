@@ -11,8 +11,10 @@ entirely in the browser tab.
   SOCKS/HTTP mixed inbound.
 - **DNS over HTTPS** for remote resolution, tunneled through your own proxy
   outbound (`detour: proxy`), with a `hosts`-type bootstrap so the resolver's
-  own hostname never leaks over plaintext DNS. Local/direct resolution stays
-  on plain UDP for LAN and split-horizon domains.
+  own hostname never leaks over plaintext DNS. Local/direct resolution
+  defaults to the OS's own resolver (sing-box's `local` DNS server type) —
+  matching what your browser gets with no proxy at all — or a specific
+  IP if you set one.
 - **Fail-closed routing**: `route.final` is your proxy outbound. Only private
   IPs and the `geosite-private` rule-set go direct — everything else is
   tunneled or dropped, never silently sent out in the clear. `geosite-private`
