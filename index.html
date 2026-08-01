@@ -231,9 +231,9 @@
             <textarea id="optBypassDomains" class="bypass-input" rows="4" spellcheck="false"
               placeholder="example.com&#10;.internal.corp.example&#10;keyword:analytics&#10;regex:^ads\."></textarea>
             <span class="field-label field-label-hint">
-              Prefix a line with <code>.</code> to match subdomains only (not the bare domain) ·
-              <code>keyword:</code> for a substring match ·
-              <code>regex:</code> for a regular expression
+              Prefix a line with <code>.</code> or <code>*.</code> to match subdomains only (not the bare domain) ·
+              <code>keyword:</code> for a substring match · <code>regex:</code> for a regular expression ·
+              full URLs are cleaned to a bare hostname automatically
             </span>
           </label>
         </fieldset>

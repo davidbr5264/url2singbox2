@@ -184,20 +184,49 @@ function parseBypassDomains(text) {
   const domain_regex = [];
   const warnings = [];
 
+  // sing-box matches domain_suffix/domain_keyword as plain strings against
+  // the sniffed SNI/Host — not a URL — so anything shaped like a URL has to
+  // be reduced to a bare hostname first or it will silently never match.
+  function normalizeHost(input) {
+    let d = input.trim();
+    d = d.replace(/^[a-z][a-z0-9+.-]*:\/\//i, "");   // strip scheme, e.g. https://
+    d = d.split(/[/?#]/)[0];                          // strip path/query/fragment
+    d = d.replace(/:\d+$/, "");                       // strip :port
+    d = d.replace(/\.$/, "");                         // strip trailing dot
+    return d.toLowerCase();
+  }
+
   text.split("\n").forEach(raw => {
-    const line = raw.trim();
+    let line = raw.trim();
     if (!line || line.startsWith("#")) return;
 
     if (line.toLowerCase().startsWith("regex:")) {
       const pattern = line.slice(6).trim();
+      if (!pattern) { warnings.push("Empty regex rule — skipped."); return; }
       try { new RegExp(pattern); domain_regex.push(pattern); }
       catch { warnings.push(`Bypass rule "${line}" isn't a valid regular expression — skipped.`); }
-    } else if (line.toLowerCase().startsWith("keyword:")) {
-      const kw = line.slice(8).trim();
-      if (kw) domain_keyword.push(kw); else warnings.push(`Empty keyword rule — skipped.`);
-    } else {
-      domain_suffix.push(line);
+      return;
     }
+
+    if (line.toLowerCase().startsWith("keyword:")) {
+      const kw = normalizeHost(line.slice(8));
+      if (kw) domain_keyword.push(kw); else warnings.push("Empty keyword rule — skipped.");
+      return;
+    }
+
+    // "*.example.com" is a common wildcard convention elsewhere; sing-box's
+    // own convention for "subdomains only, not the bare domain" is a
+    // leading dot, so translate one into the other.
+    let subdomainsOnly = false;
+    if (line.startsWith("*.")) { subdomainsOnly = true; line = line.slice(2); }
+    else if (line.startsWith(".")) { subdomainsOnly = true; line = line.slice(1); }
+
+    const host = normalizeHost(line);
+    if (!host) { warnings.push(`Bypass rule "${raw.trim()}" didn't leave a usable domain after cleanup — skipped.`); return; }
+    if (!/^[a-z0-9.-]+$/.test(host) || !host.includes(".")) {
+      warnings.push(`"${raw.trim()}" doesn't look like a plain domain (paste just the hostname, not a full URL) — kept as-is, double check it.`);
+    }
+    domain_suffix.push(subdomainsOnly ? `.${host}` : host);
   });
 
   return { domain_suffix, domain_keyword, domain_regex, warnings };
