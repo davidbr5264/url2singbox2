@@ -233,6 +233,33 @@ function parseBypassDomains(text) {
 }
 
 // ============================================================
+// BYPASS APPLICATION PARSING
+// One process name (or full path — only the filename is kept) per line.
+// sing-box's process_name route field matches the executable's file name.
+// ============================================================
+function parseBypassApps(text) {
+  const processNames = [];
+  const warnings = [];
+
+  text.split("\n").forEach(raw => {
+    let line = raw.trim();
+    if (!line || line.startsWith("#")) return;
+
+    // Accept a full path (Windows or POSIX-style) and reduce it to the
+    // executable's file name, since that's what process_name matches on.
+    line = line.replace(/^["']|["']$/g, "");
+    const base = line.split(/[\\/]/).pop().trim();
+    if (!base) { warnings.push(`Bypass app rule "${raw.trim()}" didn't leave a usable name — skipped.`); return; }
+    if (!/\.exe$/i.test(base)) {
+      warnings.push(`"${base}" doesn't end in .exe — process_name matching needs the exact executable file name on Windows.`);
+    }
+    processNames.push(base);
+  });
+
+  return { processNames: [...new Set(processNames)], warnings };
+}
+
+// ============================================================
 // CONFIG BUILDER
 // ============================================================
 function buildConfig(entries, opts) {
@@ -245,6 +272,9 @@ function buildConfig(entries, opts) {
   if (bypass.domain_suffix.length) bypassFields.domain_suffix = bypass.domain_suffix;
   if (bypass.domain_keyword.length) bypassFields.domain_keyword = bypass.domain_keyword;
   if (bypass.domain_regex.length) bypassFields.domain_regex = bypass.domain_regex;
+
+  const bypassApps = opts.bypassApps || { processNames: [] };
+  const hasBypassApps = bypassApps.processNames.length > 0;
 
   // dedupe tags
   const seen = new Map();
@@ -309,6 +339,9 @@ function buildConfig(entries, opts) {
   dnsRules.push({ action: "predefined", rcode: "NOERROR", query_type: [64, 65] });
   if (hasBypass) {
     dnsRules.push({ server: hasDirectResolver ? "direct_dns" : "remote_dns", ...bypassFields });
+  }
+  if (hasBypassApps) {
+    dnsRules.push({ server: hasDirectResolver ? "direct_dns" : "remote_dns", process_name: bypassApps.processNames });
   }
   dnsRules.push({ server: hasDirectResolver ? "direct_dns" : "remote_dns", rule_set: ["geosite-private"] });
 
@@ -389,6 +422,9 @@ function buildConfig(entries, opts) {
   routeRules.push({ outbound: "direct", ip_is_private: true });
   if (hasBypass) {
     routeRules.push({ outbound: "direct", ...bypassFields });
+  }
+  if (hasBypassApps) {
+    routeRules.push({ outbound: "direct", process_name: bypassApps.processNames });
   }
   routeRules.push({ outbound: "direct", rule_set: ["geosite-private"] });
   routeRules.push({ outbound: proxyTag, port_range: ["0:65535"] });
@@ -482,6 +518,7 @@ const optionEls = {
   logLevel: document.getElementById("optLogLevel"),
   cacheFile: document.getElementById("optCacheFile"),
   bypassDomains: document.getElementById("optBypassDomains"),
+  bypassApps: document.getElementById("optBypassApps"),
 };
 
 function readOptions() {
@@ -641,6 +678,9 @@ function regenerate() {
   const bypass = parseBypassDomains(optionEls.bypassDomains.value);
   bypass.warnings.forEach(w => allWarnings.push(w));
   opts.bypass = bypass;
+  const bypassApps = parseBypassApps(optionEls.bypassApps.value);
+  bypassApps.warnings.forEach(w => allWarnings.push(w));
+  opts.bypassApps = bypassApps;
   const config = buildConfig(entries, opts);
   lastConfig = config;
 

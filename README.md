@@ -32,6 +32,11 @@ entirely in the browser tab.
   `geosite-private`. One per line; a bare domain matches itself and its
   subdomains, a leading `.` matches subdomains only, and `keyword:`/`regex:`
   prefixes give substring/regex matching.
+- **Bypass applications**: a list of Windows executables (`steam.exe`, or a
+  full path — only the file name is used) whose traffic is sent direct via
+  `process_name` matching, for apps that break under a VPN/TUN (games with
+  anti-cheat, LAN-discovery tools, etc). Applied to both DNS and routing,
+  independent of the bypass-domain rule.
 
 ## Run it locally
 

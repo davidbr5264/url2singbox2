@@ -238,6 +238,21 @@
           </label>
         </fieldset>
 
+        <fieldset class="opt-group opt-group-wide">
+          <legend>Bypass applications <span class="legend-note">— those apps' traffic sent direct, by process name</span></legend>
+
+          <label class="field">
+            <span class="field-label">One Windows executable per line.</span>
+            <textarea id="optBypassApps" class="bypass-input" rows="3" spellcheck="false"
+              placeholder="steam.exe&#10;EpicGamesLauncher.exe&#10;C:\Program Files\App\app.exe"></textarea>
+            <span class="field-label field-label-hint">
+              Matches by process name (e.g. <code>steam.exe</code>) — a full path is fine too, only the
+              filename is used. Useful for apps that break under a VPN/TUN, like games with anti-cheat
+              or LAN-discovery tools.
+            </span>
+          </label>
+        </fieldset>
+
       </div>
     </section>
 
