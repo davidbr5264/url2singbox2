@@ -264,7 +264,7 @@ function parseBypassApps(text) {
 // ============================================================
 function buildConfig(entries, opts) {
   const okEntries = entries.filter(e => e.ok);
-  const outbounds = okEntries.map(e => e.outbound);
+  const outbounds = okEntries.map(e => ({ ...e.outbound }));
 
   const bypass = opts.bypass || { domain_suffix: [], domain_keyword: [], domain_regex: [] };
   const hasBypass = bypass.domain_suffix.length || bypass.domain_keyword.length || bypass.domain_regex.length;
@@ -275,6 +275,22 @@ function buildConfig(entries, opts) {
 
   const bypassApps = opts.bypassApps || { processNames: [] };
   const hasBypassApps = bypassApps.processNames.length > 0;
+
+  const useSystemDns = opts.localDns === "system";
+  const localDnsIp = opts.localDns === "custom" ? opts.localDnsCustom
+    : useSystemDns ? null
+    : opts.localDns;
+  const hasDirectResolver = useSystemDns || !!localDnsIp;
+
+  // Pin each proxy outbound's own server-hostname resolution to the direct
+  // resolver. Left unset, it falls back to route.default_domain_resolver —
+  // if that ever pointed at the DoH server (tunneled through this same
+  // outbound), a domain-based VLESS server would deadlock resolving itself
+  // through itself. Only matters when the server is a domain, not an IP,
+  // but it's free to set unconditionally.
+  if (hasDirectResolver) {
+    outbounds.forEach(o => { o.domain_resolver = "direct_dns"; });
+  }
 
   // dedupe tags
   const seen = new Map();
@@ -297,12 +313,6 @@ function buildConfig(entries, opts) {
   if (opts.remoteDns === "custom" && opts.remoteDnsCustom) {
     hostsEntries[opts.remoteDnsCustom] = [];
   }
-
-  const useSystemDns = opts.localDns === "system";
-  const localDnsIp = opts.localDns === "custom" ? opts.localDnsCustom
-    : useSystemDns ? null
-    : opts.localDns;
-  const hasDirectResolver = useSystemDns || !!localDnsIp;
 
   const dnsServers = [];
 
@@ -366,7 +376,13 @@ function buildConfig(entries, opts) {
     type: "tun",
     tag: "tun",
     interface_name: opts.tunName,
-    address: [opts.tunAddr],
+    // sing-box only programs OS routes for address families actually present
+    // on the TUN interface. Without a v6 address here, IPv6 traffic is never
+    // routed into the TUN at all — so a route-rule "reject" for ip_version:6
+    // would never even see it, and it leaks out the physical adapter instead.
+    // Adding this address is what makes the reject (or, if you disable
+    // rejection, a future proxy-routed) rule actually take effect.
+    address: opts.blockIpv6 ? [opts.tunAddr, "fdfe:dcba:9876::1/126"] : [opts.tunAddr],
     mtu: opts.tunMtu,
     auto_route: true,
     strict_route: opts.strictRoute,
@@ -448,6 +464,7 @@ function buildConfig(entries, opts) {
   }
 
   const config = {
+    $schema: "https://sing-box.sagernet.org/schema.json",
     log: { level: opts.logLevel, timestamp: true },
     dns,
     inbounds,
@@ -675,6 +692,9 @@ function regenerate() {
   }
 
   const opts = readOptions();
+  if (opts.localDns === "custom" && !opts.localDnsCustom) {
+    allWarnings.push("Local resolver is set to \"Custom IP…\" but the field is empty — direct/bypass domains will fall back to resolving via the tunneled DoH server instead, which can deadlock for a domain-based proxy server. Set an IP or switch to System default.");
+  }
   const bypass = parseBypassDomains(optionEls.bypassDomains.value);
   bypass.warnings.forEach(w => allWarnings.push(w));
   opts.bypass = bypass;

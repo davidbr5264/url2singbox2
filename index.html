@@ -131,7 +131,7 @@
           <label class="toggle">
             <input type="checkbox" id="optBlockIpv6" checked>
             <span class="toggle-track"><span class="toggle-thumb"></span></span>
-            <span class="toggle-text">Reject IPv6<small>TUN only advertises an IPv4 route — this closes the v6 leak path</small></span>
+            <span class="toggle-text">Reject IPv6<small>adds an IPv6 TUN address so v6 traffic is actually captured, then dropped — off leaves it unrouted and on the physical adapter</small></span>
           </label>
         </fieldset>
 
