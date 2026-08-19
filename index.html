@@ -1,306 +1,49 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>vless → sing-box · config forge</title>
-<meta name="description" content="Convert vless:// links into hardened sing-box client configs for Windows. Runs entirely in your browser — nothing is uploaded.">
-<link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 24 24%22><rect width=%2224%22 height=%2224%22 rx=%225%22 fill=%22%230b0e14%22/><path d=%22M4 12h4l2-6 4 12 2-6h4%22 stroke=%22%233ddc97%22 stroke-width=%222%22 fill=%22none%22 stroke-linecap=%22round%22 stroke-linejoin=%22round%22/></svg>">
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="style.css">
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Config Forge | VLESS to Sing-Box</title>
+    <link rel="stylesheet" href="style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
 </head>
 <body>
+    <div class="app-container">
+        <header>
+            <h1>Config Forge</h1>
+            <p>Convert vless:// links to sing-box client configurations instantly.</p>
+        </header>
+        
+        <main>
+            <div class="input-group">
+                <label for="vlessUri">VLESS URI</label>
+                <textarea id="vlessUri" rows="4" placeholder="vless://uuid@server:port?encryption=none&..."></textarea>
+            </div>
 
-<div class="noise" aria-hidden="true"></div>
+            <div class="toggles-group">
+                <label class="toggle-label">
+                    <input type="checkbox" id="optBlockQuic" checked>
+                    Block UDP/443 (QUIC)
+                </label>
+                <label class="toggle-label">
+                    <input type="checkbox" id="optStrictRoute" checked>
+                    Strict TUN Routing
+                </label>
+                <label class="toggle-label">
+                    <input type="checkbox" id="optBlockIpv6" checked>
+                    Reject IPv6 Traffic
+                </label>
+            </div>
 
-<header class="top">
-  <div class="top-inner">
-    <div class="brand">
-      <span class="brand-mark" aria-hidden="true">
-        <svg viewBox="0 0 24 24" width="20" height="20"><path d="M2 12h4.5l2.5-7 5 14 2.5-7H22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
-      </span>
-      <span class="brand-text">config<span class="brand-accent">forge</span></span>
+            <button id="btnGenerate" class="primary-btn">Generate config.json</button>
+            
+            <div class="output-group" id="outputSection" style="display: none;">
+                <label for="configOutput">Generated JSON</label>
+                <textarea id="configOutput" rows="10" readonly></textarea>
+                <button id="btnCopy" class="secondary-btn">Copy to Clipboard</button>
+            </div>
+        </main>
     </div>
-    <div class="top-meta">
-      <span class="pill">runs in your browser</span>
-      <span class="pill pill-target">target: sing-box · windows</span>
-    </div>
-  </div>
-</header>
-
-<main class="shell">
-
-  <section class="intro">
-    <p class="eyebrow">vless:// → config.json</p>
-    <h1>Turn a share link into a hardened client config.</h1>
-    <p class="lede">Paste one or more <code>vless://</code> links. Config Forge builds a sing-box config for the Windows client — TUN inbound, DNS over HTTPS routed through your own proxy, and a fail-closed route table — using the same shape as a v2rayN-generated config. Nothing leaves this tab: the conversion runs locally in JavaScript.</p>
-  </section>
-
-  <!-- SIGNAL PATH — signature element -->
-  <section class="signal-path" id="signalPath" aria-label="Connection path status">
-    <div class="path-track">
-      <div class="path-node" data-node="link" data-state="idle">
-        <span class="node-dot"></span>
-        <span class="node-label">link</span>
-      </div>
-      <div class="path-wire" data-wire="1"><span class="wire-pulse"></span></div>
-      <div class="path-node" data-node="tls" data-state="idle">
-        <span class="node-dot"></span>
-        <span class="node-label">tls / reality</span>
-      </div>
-      <div class="path-wire" data-wire="2"><span class="wire-pulse"></span></div>
-      <div class="path-node" data-node="dns" data-state="idle">
-        <span class="node-dot"></span>
-        <span class="node-label">doh dns</span>
-      </div>
-      <div class="path-wire" data-wire="3"><span class="wire-pulse"></span></div>
-      <div class="path-node" data-node="route" data-state="idle">
-        <span class="node-dot"></span>
-        <span class="node-label">route</span>
-      </div>
-      <div class="path-wire" data-wire="4"><span class="wire-pulse"></span></div>
-      <div class="path-node" data-node="out" data-state="idle">
-        <span class="node-dot"></span>
-        <span class="node-label">config.json</span>
-      </div>
-    </div>
-  </section>
-
-  <div class="workspace">
-
-    <!-- LEFT: INPUT + OPTIONS -->
-    <section class="panel input-panel">
-
-      <div class="panel-head">
-        <h2>01 · links</h2>
-        <span class="panel-sub">one per line</span>
-      </div>
-
-      <textarea id="vlessInput" class="link-input" rows="5" spellcheck="false"
-        placeholder="vless://uuid@server:443?security=reality&type=tcp&flow=xtls-rprx-vision&pbk=...&sid=...&sni=...#My-Server"></textarea>
-
-      <div class="input-row">
-        <button id="parseBtn" class="btn btn-primary">parse links</button>
-        <button id="sampleBtn" class="btn btn-ghost">load sample</button>
-        <span id="parseStatus" class="parse-status"></span>
-      </div>
-
-      <div id="linkResults" class="link-results" aria-live="polite"></div>
-
-      <div class="panel-head panel-head-spaced">
-        <h2>02 · options</h2>
-        <span class="panel-sub">hardened defaults — edit if needed</span>
-      </div>
-
-      <div class="options-grid">
-
-        <fieldset class="opt-group">
-          <legend>DNS &amp; privacy</legend>
-
-          <label class="field">
-            <span class="field-label">Remote resolver (DNS‑over‑HTTPS, tunneled through proxy)</span>
-            <select id="optRemoteDns">
-              <option value="cloudflare" selected>Cloudflare — cloudflare-dns.com</option>
-              <option value="google">Google — dns.google</option>
-              <option value="quad9">Quad9 — dns.quad9.net</option>
-              <option value="alidns">AliDNS — dns.alidns.com</option>
-              <option value="custom">Custom domain…</option>
-            </select>
-          </label>
-          <input type="text" id="optRemoteDnsCustom" class="field-sub" placeholder="doh.example.com" hidden>
-
-          <label class="field">
-            <span class="field-label">Local / direct resolver (for LAN &amp; direct domains)</span>
-            <select id="optLocalDns">
-              <option value="119.29.29.29">119.29.29.29 — DNSPod</option>
-              <option value="223.5.5.5">223.5.5.5 — AliDNS</option>
-              <option value="system" selected>System default</option>
-              <option value="custom">Custom IP…</option>
-            </select>
-          </label>
-          <input type="text" id="optLocalDnsCustom" class="field-sub" placeholder="10.0.0.1" hidden>
-
-          <label class="toggle">
-            <input type="checkbox" id="optBlockQuic" checked>
-            <span class="toggle-track"><span class="toggle-thumb"></span></span>
-            <span class="toggle-text">Block UDP/443 (QUIC)<small>stops traffic bypassing the proxy over HTTP/3</small></span>
-          </label>
-
-          <label class="toggle">
-            <input type="checkbox" id="optBlockIpv6" checked>
-            <span class="toggle-track"><span class="toggle-thumb"></span></span>
-            <span class="toggle-text">Reject IPv6<small>adds an IPv6 TUN address so v6 traffic is actually captured, then dropped — off leaves it unrouted and on the physical adapter</small></span>
-          </label>
-        </fieldset>
-
-        <fieldset class="opt-group">
-          <legend>TUN interface</legend>
-
-          <label class="field">
-            <span class="field-label">Interface name</span>
-            <input type="text" id="optTunName" value="singbox_tun">
-          </label>
-          <label class="field">
-            <span class="field-label">Address (CIDR)</span>
-            <input type="text" id="optTunAddr" value="172.18.0.1/30">
-          </label>
-          <label class="field field-inline">
-            <span class="field-label">MTU</span>
-            <input type="number" id="optTunMtu" value="9000">
-          </label>
-          <label class="field">
-            <span class="field-label">Stack</span>
-            <select id="optTunStack">
-              <option value="gvisor" selected>gvisor — safest, most compatible</option>
-              <option value="mixed">mixed</option>
-              <option value="system">system — fastest, needs WinTun</option>
-            </select>
-          </label>
-          <label class="toggle">
-            <input type="checkbox" id="optStrictRoute" checked>
-            <span class="toggle-track"><span class="toggle-thumb"></span></span>
-            <span class="toggle-text">Strict route<small>forces all system traffic into the TUN, even off-subnet</small></span>
-          </label>
-        </fieldset>
-
-        <fieldset class="opt-group">
-          <legend>Local inbounds</legend>
-
-          <label class="toggle">
-            <input type="checkbox" id="optSocksEnable" checked>
-            <span class="toggle-track"><span class="toggle-thumb"></span></span>
-            <span class="toggle-text">SOCKS/HTTP mixed inbound<small>for apps that don't use the system proxy</small></span>
-          </label>
-          <label class="field field-inline" id="socksPortRow">
-            <span class="field-label">Port</span>
-            <input type="number" id="optSocksPort" value="10808">
-          </label>
-
-          <label class="toggle">
-            <input type="checkbox" id="optClashApi" checked>
-            <span class="toggle-track"><span class="toggle-thumb"></span></span>
-            <span class="toggle-text">Clash API<small>for GUI clients (v2rayN tray, yacd, etc.) — bound to localhost</small></span>
-          </label>
-          <label class="field field-inline" id="clashPortRow">
-            <span class="field-label">Port</span>
-            <input type="number" id="optClashPort" value="10814">
-          </label>
-          <label class="field" id="clashSecretRow">
-            <span class="field-label">API secret <small>(recommended if exposing beyond localhost)</small></span>
-            <input type="text" id="optClashSecret" placeholder="leave blank for none">
-          </label>
-        </fieldset>
-
-        <fieldset class="opt-group">
-          <legend>Rule sets &amp; misc</legend>
-
-          <label class="field">
-            <span class="field-label">geosite-private rule-set source</span>
-            <select id="optRuleSetMode">
-              <option value="remote">Auto-download (SagerNet, recommended)</option>
-              <option value="local" selected>Local file on disk</option>
-            </select>
-          </label>
-          <input type="text" id="optRuleSetPath" class="field-sub"
-                 value="C:\\sing-box\\geosite-private.srs">
-
-          <label class="field">
-            <span class="field-label">Log level</span>
-            <select id="optLogLevel">
-              <option value="warn" selected>warn</option>
-              <option value="info">info</option>
-              <option value="debug">debug</option>
-              <option value="error">error</option>
-            </select>
-          </label>
-
-          <label class="toggle">
-            <input type="checkbox" id="optCacheFile" checked>
-            <span class="toggle-track"><span class="toggle-thumb"></span></span>
-            <span class="toggle-text">DNS cache file<small>persists fakeip/cache across restarts, kept next to config.json</small></span>
-          </label>
-        </fieldset>
-
-        <fieldset class="opt-group opt-group-wide">
-          <legend>Bypass domains <span class="legend-note">— sent direct, not through the proxy</span></legend>
-
-          <label class="field">
-            <span class="field-label">One per line. Matches the domain and its subdomains by default.</span>
-            <textarea id="optBypassDomains" class="bypass-input" rows="4" spellcheck="false"
-              placeholder="example.com&#10;.internal.corp.example&#10;keyword:analytics&#10;regex:^ads\."></textarea>
-            <span class="field-label field-label-hint">
-              Prefix a line with <code>.</code> or <code>*.</code> to match subdomains only (not the bare domain) ·
-              <code>keyword:</code> for a substring match · <code>regex:</code> for a regular expression ·
-              full URLs are cleaned to a bare hostname automatically
-            </span>
-          </label>
-        </fieldset>
-
-        <fieldset class="opt-group opt-group-wide">
-          <legend>Bypass applications <span class="legend-note">— those apps' traffic sent direct, by process name</span></legend>
-
-          <label class="field">
-            <span class="field-label">One Windows executable per line.</span>
-            <textarea id="optBypassApps" class="bypass-input" rows="3" spellcheck="false"
-              placeholder="steam.exe&#10;EpicGamesLauncher.exe&#10;C:\Program Files\App\app.exe"></textarea>
-            <span class="field-label field-label-hint">
-              Matches by process name (e.g. <code>steam.exe</code>) — a full path is fine too, only the
-              filename is used. Useful for apps that break under a VPN/TUN, like games with anti-cheat
-              or LAN-discovery tools.
-            </span>
-          </label>
-        </fieldset>
-
-      </div>
-    </section>
-
-    <!-- RIGHT: OUTPUT -->
-    <section class="panel output-panel">
-      <div class="panel-head">
-        <h2>03 · config.json</h2>
-        <div class="output-actions">
-          <button id="copyBtn" class="btn btn-ghost btn-sm" disabled>copy</button>
-          <button id="downloadBtn" class="btn btn-primary btn-sm" disabled>download config.json</button>
-        </div>
-      </div>
-
-      <div id="warnings" class="warnings" hidden></div>
-
-      <pre id="output" class="output-code"><code id="outputCode">// parse a link on the left to generate a config here</code></pre>
-    </section>
-
-  </div>
-
-  <section class="notes">
-    <h2>reading the output</h2>
-    <div class="notes-grid">
-      <div class="note">
-        <h3>DNS never leaks in the clear</h3>
-        <p>Remote lookups go out as DoH, and that DoH request is itself sent through the <code>proxy</code> outbound — your resolver sees the proxy server, never your ISP. Direct/LAN domains use the local resolver over plain UDP so split-horizon and captive portals still work.</p>
-      </div>
-      <div class="note">
-        <h3>Fail closed, not fail open</h3>
-        <p><code>route.final</code> is <code>proxy</code>. Anything not explicitly matched to <code>direct</code> — private IPs and the geosite-private set — goes through the tunnel. If the tunnel is down, it fails, it doesn't silently fall back to your real IP.</p>
-      </div>
-      <div class="note">
-        <h3>Two common leak paths, closed by default</h3>
-        <p>QUIC (UDP/443) can carry HTTP/3 straight past a TCP-only proxy path; it's rejected. IPv6 isn't captured by the IPv4-only TUN address here, so it's rejected too rather than left to route unprotected — both are toggles above if you'd rather handle them differently.</p>
-      </div>
-      <div class="note">
-        <h3>Windows paths</h3>
-        <p>This build targets the Windows sing-box client: <code>experimental.cache_file.path</code> and the rule-set path (if you choose local rule-sets) use Windows-style paths. Point the rule-set path at wherever your sing-box install keeps its <code>.srs</code> files, or leave it on auto-download.</p>
-      </div>
-    </div>
-  </section>
-
-  <footer class="site-footer">
-    <p>Client-side only — your links, UUIDs, and keys are never transmitted anywhere. Verify with <code>sing-box check -c config.json</code> before relying on it.</p>
-  </footer>
-
-</main>
-
-<script src="app.js"></script>
+    <script src="app.js"></script>
 </body>
 </html>
