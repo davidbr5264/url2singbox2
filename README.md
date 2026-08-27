@@ -54,16 +54,23 @@ Each verified directly against the real v2rayN source, not guessed:
 - **Automatic self-process exclusion**: this client's own traffic is always
   excluded from the tunnel by process name (platform-correct binary name),
   with no manual path to configure — matching v2rayN's own behavior.
-- **TLS record fragmentation** (anti-DPI SNI evasion) is exposed as a
-  toggle — a real v2rayN TUN option. **ICMP routing policy**, **DNS
-  strategy** (`domain_resolver.strategy`), and **forced TLS fingerprint**
-  are implemented in `buildConfig()` and correctly wired end-to-end, but
-  fixed to v2rayN's own defaults (ordinary routing rules for ICMP, no
-  strategy preference, no forced fingerprint) rather than exposed as UI
-  fields — they were rarely-touched advanced options, and the fields added
-  more clutter than value for most people. `FIXED_ICMP_ROUTING`,
-  `FIXED_DNS_STRATEGY`, `FIXED_FORCE_FINGERPRINT` in `app.js` if you want
-  them back as fields, or just want to change the fixed value.
+- **ICMP routing policy**, **DNS strategy** (`domain_resolver.strategy`),
+  **forced TLS fingerprint**, and **TLS record fragmentation** (anti-DPI
+  SNI evasion, v2rayN's `EnableFinalFragment`) are all implemented in
+  `buildConfig()` and correctly wired end-to-end, but fixed to v2rayN's
+  own defaults (ordinary routing rules for ICMP, no strategy preference,
+  no forced fingerprint, fragmentation off) rather than exposed as UI
+  fields. The first three are rarely-touched for virtually everyone.
+  Fragmentation is the one exception worth knowing about: whether it
+  helps depends on your network — it's the difference between connecting
+  and not on an SNI-blocking connection, and pure overhead everywhere
+  else — so there's no single default that's right for most people either
+  way; it's fixed off (matching v2rayN's own default) rather than exposed,
+  to keep the step 3 form shorter. `FIXED_ICMP_ROUTING`,
+  `FIXED_DNS_STRATEGY`, `FIXED_FORCE_FINGERPRINT`, `FIXED_TLS_FRAGMENT` in
+  `app.js` if you want any of them back as fields, or just want to change
+  the fixed value — flipping `FIXED_TLS_FRAGMENT` to `true` turns
+  fragmentation on for everyone using your deployed copy.
 - Flow normalization (`xtls-rprx-vision-udp443` → `xtls-rprx-vision`),
   matching v2rayN's own normalization.
 

@@ -43,6 +43,13 @@ const FIXED_LOG_LEVEL = "warn";
 const FIXED_FORCE_FINGERPRINT = "";
 const FIXED_ICMP_ROUTING = "rule";
 const FIXED_DNS_STRATEGY = "";
+// TLS record fragmentation (anti-DPI SNI evasion, v2rayN's EnableFinalFragment)
+// is genuinely environment-dependent rather than rarely-touched — it helps on
+// SNI-blocking networks and costs a little latency everywhere else — so this
+// was a toggle for a while. Fixed off (v2rayN's own default) at your request;
+// flip to true here to turn it back on for everyone, or reintroduce it as a
+// field the same way the other FIXED_* constants above could be.
+const FIXED_TLS_FRAGMENT = false;
 
 // ============================================================
 // v2rayN-FAITHFUL DNS ADDRESS PARSING
@@ -681,7 +688,7 @@ function buildConfig(entries, opts) {
       action: "hijack-dns"
     }
   );
-  if (opts.tlsFragment) {
+  if (FIXED_TLS_FRAGMENT) {
     routeRules.push({ protocol: ["tls"], action: "route-options", tls_record_fragment: true });
   }
   routeRules.push(
@@ -793,7 +800,6 @@ const optionEls = {
   tunAddr: document.getElementById("optTunAddr"),
   tunStack: document.getElementById("optTunStack"),
   strictRoute: document.getElementById("optStrictRoute"),
-  tlsFragment: document.getElementById("optTlsFragment"),
   socksEnable: document.getElementById("optSocksEnable"),
   socksPort: document.getElementById("optSocksPort"),
   clashApi: document.getElementById("optClashApi"),
@@ -1018,7 +1024,6 @@ function readOptions() {
     tunStack: optionEls.tunStack.value,
     strictRoute: optionEls.strictRoute.checked,
     icmpRouting: FIXED_ICMP_ROUTING,
-    tlsFragment: optionEls.tlsFragment.checked,
     socksEnable: optionEls.socksEnable.checked,
     socksPort: parseInt(optionEls.socksPort.value, 10) || 10808,
     clashApi: optionEls.clashApi.checked,
