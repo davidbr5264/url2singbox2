@@ -969,7 +969,7 @@ function applyPlatformDefaults() {
   const isLinux = platform === "linux";
 
   const pill = document.getElementById("platformPill");
-  if (pill) pill.textContent = `target: sing-box · ${isLinux ? "linux" : "windows"}`;
+  if (pill) pill.textContent = `sing-box · ${isLinux ? "linux" : "windows"}`;
 
   const hint = document.getElementById("platformHint");
   if (hint) {
