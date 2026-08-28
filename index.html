@@ -39,7 +39,7 @@
   <section class="intro">
     <p class="eyebrow">VLESS→SBX / WIN</p>
     <h1>A wiring diagram for your vless:// link, not a black box.</h1>
-    <p class="lede" id="ledeText">Five steps: paste a link, set your DNS, set your security posture, add anything optional, then review and download. This tool's DNS/routing generation is ported directly from v2rayN's actual <code>SingboxDnsService.cs</code> / <code>SingboxRoutingService.cs</code> source. Nothing leaves this tab.</p>
+    <p class="lede" id="ledeText">Paste a <code>vless://</code> link to generate a sing-box config. Runs entirely in this tab.</p>
   </section>
 
   <!-- STEPPER -->
@@ -77,7 +77,7 @@
     <div class="step-panel" data-step="1" data-active="1">
       <div class="step-panel-head">
         <h2>01 · paste your link</h2>
-        <p>One or more <code>vless://</code> share links, one per line. Multiple links build a selector so you can flip between servers later.</p>
+        <p>One <code>vless://</code> link per line — multiple build a selector.</p>
       </div>
 
       <textarea id="vlessInput" class="link-input" rows="5" spellcheck="false"
@@ -97,7 +97,7 @@
           <span class="platform-badge-dot"></span>
           <div class="platform-badge-text">
             <strong>This build targets Windows.</strong>
-            <span class="field-label field-label-hint" id="platformHint">TUN mode needs Administrator — right-click sing-box (or your terminal) and "Run as administrator".</span>
+            <span class="field-label field-label-hint" id="platformHint">TUN mode needs Administrator — run sing-box as admin.</span>
           </div>
           <a href="linux.html" class="btn btn-ghost btn-sm">switch to Linux version →</a>
         </div>
@@ -114,7 +114,6 @@
     <div class="step-panel" data-step="2">
       <div class="step-panel-head">
         <h2>02 · dns resolution</h2>
-        <p>v2rayN's 3-tier architecture: a bootstrap resolver handles the remote/direct servers' own hostnames, so any custom DoH provider works out of the box.</p>
       </div>
 
       <div class="options-grid">
@@ -145,15 +144,14 @@
           </label>
           <input type="text" id="optDirectDnsCustom" class="field-sub" placeholder="1.1.1.1 or https://doh.example.com/dns-query" hidden>
           <span class="field-label field-label-hint">
-            v2rayN's actual default is 119.29.29.29 (DNSPod), a China-anycast address unreachable for many
-            users outside China. Defaulted to <strong>System default</strong> here instead.
+            Defaults to <strong>System default</strong> — v2rayN's own default (DNSPod) is unreachable for many outside China.
           </span>
         </fieldset>
 
         <fieldset class="opt-group">
           <legend>Bootstrap resolver</legend>
           <label class="field">
-            <span class="field-label">Bootstrap resolver <small>resolves the remote/direct servers' own hostnames — plain IP, no chicken-and-egg problem</small></span>
+            <span class="field-label">Bootstrap resolver <small>resolves the DNS servers' own hostnames</small></span>
             <select id="optBootstrapDns">
               <option value="119.29.29.29">119.29.29.29 — DNSPod (v2rayN default)</option>
               <option value="223.5.5.5">223.5.5.5 — AliDNS</option>
@@ -178,7 +176,6 @@
     <div class="step-panel" data-step="3">
       <div class="step-panel-head">
         <h2>03 · security posture</h2>
-        <p>Leak protection, TUN interface behavior, and anti-detection options — the real v2rayN TUN policies (ICMP routing, TLS fragmentation) most generators skip.</p>
       </div>
 
       <div class="options-grid">
@@ -187,17 +184,17 @@
           <label class="toggle">
             <input type="checkbox" id="optBlockQuic" checked>
             <span class="toggle-track"><span class="toggle-thumb"></span></span>
-            <span class="toggle-text">Block UDP/443 (QUIC)<small>stops traffic bypassing the proxy over HTTP/3</small></span>
+            <span class="toggle-text">Block UDP/443 (QUIC)<small>prevents HTTP/3 bypass</small></span>
           </label>
           <label class="toggle">
             <input type="checkbox" id="optBlockIpv6" checked>
             <span class="toggle-track"><span class="toggle-thumb"></span></span>
-            <span class="toggle-text">Reject IPv6<small>drops IPv6 that reaches the tunnel — true leak-proofing needs it disabled at the OS/adapter level too</small></span>
+            <span class="toggle-text">Reject IPv6<small>also disable IPv6 at the OS level for full leak-proofing</small></span>
           </label>
           <label class="toggle">
             <input type="checkbox" id="optBlockAaaaQuery">
             <span class="toggle-track"><span class="toggle-thumb"></span></span>
-            <span class="toggle-text">Block AAAA DNS answers<small>answers every AAAA lookup empty instead of forwarding it — forces IPv4 at the DNS level, ahead of "Reject IPv6" above</small></span>
+            <span class="toggle-text">Block AAAA DNS answers<small>forces IPv4 at the DNS level</small></span>
           </label>
         </fieldset>
 
@@ -218,11 +215,10 @@
           <label class="toggle">
             <input type="checkbox" id="optStrictRoute" checked>
             <span class="toggle-track"><span class="toggle-thumb"></span></span>
-            <span class="toggle-text">Strict route<small>forces all system traffic into the TUN, even off-subnet</small></span>
+            <span class="toggle-text">Strict route<small>routes all system traffic into the TUN</small></span>
           </label>
           <span class="field-label field-label-hint">
-            This client's own traffic is always excluded from the tunnel automatically, by process name —
-            no manual path needed.
+            Own traffic is auto-excluded from the tunnel by process name.
           </span>
         </fieldset>
       </div>
@@ -240,7 +236,6 @@
     <div class="step-panel" data-step="4">
       <div class="step-panel-head">
         <h2>04 · optional extras</h2>
-        <p>Everything here is optional — local inbounds, rule sets, and domains/apps you'd rather send direct.</p>
       </div>
 
       <div class="options-grid">
@@ -249,7 +244,7 @@
           <label class="toggle">
             <input type="checkbox" id="optSocksEnable">
             <span class="toggle-track"><span class="toggle-thumb"></span></span>
-            <span class="toggle-text">SOCKS/HTTP inbound<small>for apps that don't use the system proxy — off means TUN-only</small></span>
+            <span class="toggle-text">SOCKS/HTTP inbound<small>off = TUN-only</small></span>
           </label>
           <label class="field field-inline" id="socksPortRow">
             <span class="field-label">SOCKS port</span>
@@ -258,7 +253,7 @@
           <label class="toggle">
             <input type="checkbox" id="optClashApi">
             <span class="toggle-track"><span class="toggle-thumb"></span></span>
-            <span class="toggle-text">Clash API<small>for GUI clients (v2rayN tray, yacd, etc.) — bound to localhost</small></span>
+            <span class="toggle-text">Clash API<small>for GUI clients, bound to localhost</small></span>
           </label>
           <label class="field field-inline" id="clashPortRow">
             <span class="field-label">Port</span>
@@ -275,7 +270,7 @@
           <label class="toggle">
             <input type="checkbox" id="optUseGeositePrivate">
             <span class="toggle-track"><span class="toggle-thumb"></span></span>
-            <span class="toggle-text">geosite-private rule-set<small>matches local-network hostnames direct — not required: <code>ip_is_private</code> already covers private IPs</small></span>
+            <span class="toggle-text">geosite-private rule-set<small>optional — <code>ip_is_private</code> already covers private IPs</small></span>
           </label>
           <label class="field" id="ruleSetModeRow">
             <span class="field-label">geosite-private rule-set source</span>
@@ -289,7 +284,7 @@
           <label class="toggle">
             <input type="checkbox" id="optCacheFile">
             <span class="toggle-track"><span class="toggle-thumb"></span></span>
-            <span class="toggle-text">DNS cache file<small>persists fakeip/cache across restarts</small></span>
+            <span class="toggle-text">DNS cache file<small>persists DNS cache across restarts</small></span>
           </label>
         </fieldset>
 
@@ -326,7 +321,7 @@
     <div class="step-panel" data-step="5">
       <div class="step-panel-head">
         <h2>05 · review &amp; download</h2>
-        <p>Trace confirms which pieces are live. Download, then verify with <code>sing-box check -c config.json</code> before relying on it.</p>
+        <p>Verify with <code>sing-box check -c config.json</code> before relying on it.</p>
       </div>
 
       <section class="signal-path tick-frame tick-frame-signal" id="signalPath" aria-label="Connection path status">
@@ -378,30 +373,9 @@
 
   </section>
 
-  <section class="notes">
-    <h2>reading the output</h2>
-    <div class="notes-grid">
-      <div class="note">
-        <h3>Bootstrap DNS, not a hosts-only guess</h3>
-        <p>A small plain-IP bootstrap resolver handles resolving the remote/direct DNS servers' own hostnames by default — so <em>any</em> custom DoH provider works, not just ones hardcoded into a hosts table.</p>
-      </div>
-      <div class="note">
-        <h3>Real self-loop protection</h3>
-        <p>The TUN interface's own address is explicitly rejected-and-dropped in <code>route.rules</code>, matched per single address rather than by CIDR prefix — on Linux, sing-tun registers a derived address in that same prefix range with systemd-resolved as a DNS upstream, so a prefix-wide match would silently break system DNS.</p>
-      </div>
-      <div class="note">
-        <h3>No forced TLS fingerprint</h3>
-        <p>If your <code>vless://</code> link doesn't specify <code>fp=</code>, no <code>utls</code> block is added at all — matching v2rayN's own behavior. Want one anyway? Step 3 has an explicit override.</p>
-      </div>
-      <div class="note">
-        <h3>Fail closed, not fail open</h3>
-        <p><code>route.final</code> is <code>proxy</code>. Anything not explicitly matched to <code>direct</code> goes through the tunnel. If the tunnel is down, it fails, it doesn't silently fall back to your real IP.</p>
-      </div>
-    </div>
-  </section>
 
   <footer class="site-footer">
-    <p>Client-side only — your links, UUIDs, and keys are never transmitted anywhere. Interface name is fixed to <code>singbox_tun</code>, MTU to <code>9000</code>, and log level to <code>warn</code>.</p>
+    <p>Runs entirely client-side — nothing is transmitted. Interface <code>singbox_tun</code> · MTU <code>9000</code> · log level <code>warn</code>.</p>
   </footer>
 
 </main>

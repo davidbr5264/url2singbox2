@@ -980,8 +980,8 @@ function applyPlatformDefaults() {
   const hint = document.getElementById("platformHint");
   if (hint) {
     hint.textContent = isLinux
-      ? "TUN mode needs elevated capabilities — run as root, or grant the binary CAP_NET_ADMIN/CAP_NET_RAW (and CAP_SYS_PTRACE if using bypass applications) via setcap."
-      : "TUN mode needs Administrator — right-click sing-box (or your terminal) and \"Run as administrator\".";
+      ? "TUN mode needs root, or CAP_NET_ADMIN/CAP_NET_RAW (+CAP_SYS_PTRACE for bypass apps) via setcap."
+      : "TUN mode needs Administrator — run sing-box as admin.";
   }
 
   const bLabel = document.getElementById("bypassAppsLabel");
@@ -990,8 +990,8 @@ function applyPlatformDefaults() {
   const bHint = document.getElementById("bypassAppsHint");
   if (bHint) {
     bHint.innerHTML = isLinux
-      ? 'Matches by process name (e.g. <code>steam</code>) — a full path is fine too, only the filename is used. Linux truncates process names to 15 characters internally. Useful for apps that break under a VPN/TUN.'
-      : 'Matches by process name (e.g. <code>steam.exe</code>) — a full path is fine too, only the filename is used. Useful for apps that break under a VPN/TUN, like games with anti-cheat or LAN-discovery tools.';
+      ? 'Matches by process name (e.g. <code>steam</code>). Names truncate to 15 chars.'
+      : 'Matches by process name (e.g. <code>steam.exe</code>).';
   }
 
   optionEls.bypassApps.placeholder = isLinux
@@ -1000,7 +1000,7 @@ function applyPlatformDefaults() {
 
   const lede = document.getElementById("ledeText");
   if (lede) {
-    lede.innerHTML = `Paste one or more <code>vless://</code> links. Config Forge builds a sing-box config for the ${isLinux ? "Linux" : "Windows"} client — TUN inbound, DNS over HTTPS routed through your own proxy, and a fail-closed route table — using the same shape as a v2rayN-generated config. Nothing leaves this tab: the conversion runs locally in JavaScript.`;
+    lede.innerHTML = `Paste a <code>vless://</code> link to generate a sing-box config for ${isLinux ? "Linux" : "Windows"}. Runs entirely in this tab.`;
   }
 }
 
