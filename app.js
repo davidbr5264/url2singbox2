@@ -1295,7 +1295,7 @@ els.downloadBtn.addEventListener("click", () => {
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
   a.href = url;
-  a.download = `config-${optionEls.platform.value || "sing-box"}.json`;
+  a.download = "config.json";
   document.body.appendChild(a);
   a.click();
   a.remove();
