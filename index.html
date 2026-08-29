@@ -5,6 +5,11 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>vless → sing-box · config forge (windows)</title>
 <meta name="description" content="Convert vless:// links into sing-box client configs for Windows, generated with the same DNS/routing architecture as v2rayN's actual source code. Runs entirely in your browser — nothing is uploaded.">
+<meta name="theme-color" content="#1C1D1A">
+<meta property="og:type" content="website">
+<meta property="og:title" content="Config Forge — vless:// → sing-box (Windows)">
+<meta property="og:description" content="Convert vless:// links into a sing-box client config for Windows. Runs entirely in your browser — nothing is uploaded.">
+<meta name="twitter:card" content="summary">
 <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 24 24%22><rect width=%2224%22 height=%2224%22 fill=%22%231C1D1A%22/><path d=%22M3 19H11V11H19%22 stroke=%22%23C17A45%22 stroke-width=%222.4%22 fill=%22none%22/><rect x=%221.3%22 y=%2217.3%22 width=%223.4%22 height=%223.4%22 fill=%22%23E6E3D9%22/><rect x=%229.3%22 y=%229.3%22 width=%223.4%22 height=%223.4%22 fill=%22%23E6E3D9%22/><rect x=%2217.3%22 y=%221.3%22 width=%223.4%22 height=%223.4%22 fill=%22%23E6E3D9%22/></svg>">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -44,26 +49,26 @@
 
   <!-- STEPPER -->
   <nav class="stepper" id="stepper" aria-label="Setup steps">
-    <div class="step-item" data-step-btn="1" data-state="current">
+    <button type="button" class="step-item" data-step-btn="1" data-state="current">
       <span class="step-num">1</span>
       <span class="step-text"><span class="step-title">Link</span><span class="step-desc">paste &amp; parse</span></span>
-    </div>
-    <div class="step-item" data-step-btn="2" data-state="upcoming">
+    </button>
+    <button type="button" class="step-item" data-step-btn="2" data-state="upcoming">
       <span class="step-num">2</span>
       <span class="step-text"><span class="step-title">DNS</span><span class="step-desc">resolvers &amp; strategy</span></span>
-    </div>
-    <div class="step-item" data-step-btn="3" data-state="upcoming">
+    </button>
+    <button type="button" class="step-item" data-step-btn="3" data-state="upcoming">
       <span class="step-num">3</span>
       <span class="step-text"><span class="step-title">Security</span><span class="step-desc">leaks, TUN, ICMP</span></span>
-    </div>
-    <div class="step-item" data-step-btn="4" data-state="upcoming">
+    </button>
+    <button type="button" class="step-item" data-step-btn="4" data-state="upcoming">
       <span class="step-num">4</span>
       <span class="step-text"><span class="step-title">Extras</span><span class="step-desc">bypass, caching</span></span>
-    </div>
-    <div class="step-item" data-step-btn="5" data-state="upcoming">
+    </button>
+    <button type="button" class="step-item" data-step-btn="5" data-state="upcoming">
       <span class="step-num">5</span>
       <span class="step-text"><span class="step-title">Review</span><span class="step-desc">download config</span></span>
-    </div>
+    </button>
   </nav>
 
   <div class="utility-row">
@@ -248,7 +253,7 @@
           </label>
           <label class="field field-inline" id="socksPortRow">
             <span class="field-label">SOCKS port</span>
-            <input type="number" id="optSocksPort" value="10808">
+            <input type="number" id="optSocksPort" value="10808" min="1" max="65535">
           </label>
           <label class="toggle">
             <input type="checkbox" id="optClashApi">
@@ -257,7 +262,7 @@
           </label>
           <label class="field field-inline" id="clashPortRow">
             <span class="field-label">Port</span>
-            <input type="number" id="optClashPort" value="10814">
+            <input type="number" id="optClashPort" value="10814" min="1" max="65535">
           </label>
           <label class="field" id="clashSecretRow">
             <span class="field-label">API secret <small>recommended if exposing beyond localhost</small></span>

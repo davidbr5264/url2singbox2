@@ -222,6 +222,22 @@ the Next/Back buttons simply didn't work in production, despite working
 fine in any environment that doesn't enforce the CSP). All JavaScript needs
 to live in `app.js` or another same-origin `.js` file, never inline.
 
+## Testing
+
+```bash
+node test/run.js
+```
+
+No dependencies — just Node's built-in `assert`. Covers the parsing/config-
+building edge cases that came up across this project's history (Reality's
+forced `insecure=false`, IPv6 bracket hosts, ECH, `ed=`/`eh=` WebSocket
+early data, `headerType=http`, the protect-domain DNS rule, `blockAaaaQuery`,
+CIDR validation, and more) so the next change doesn't have to re-derive them
+by hand. `app.js` itself detects whether it's running in a browser or in
+Node (`typeof document !== "undefined"`) and skips all DOM wiring in the
+latter case — the `<script src="app.js">` tag in both HTML pages is
+completely unaffected by this; it's a no-op guard for testability only.
+
 ## Extending
 
 - `app.js` → `V2RAYN_DNS_PRESETS` / `V2RAYN_PREDEFINED_HOSTS` to add resolvers.

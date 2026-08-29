@@ -146,23 +146,28 @@ function parseVlessLink(raw, index) {
   const warnings = [];
   if (!raw) return null;
 
-  const m = raw.match(/^vless:\/\/([^@]+)@([^:/?#\s]+):(\d+)(\?[^#]*)?(#.*)?$/i);
+  // Host is either a bracketed IPv6 literal ([2001:db8::1]) or an ordinary
+  // domain/IPv4 host with no colons — same two shapes a browser URL parser
+  // accepts. Captured separately since IPv6's own colons would otherwise
+  // collide with the host/port separator.
+  const m = raw.match(/^vless:\/\/([^@]+)@(?:\[([^\]]+)\]|([^:/?#\s]+)):(\d+)(\?[^#]*)?(#.*)?$/i);
   if (!m) {
     return { ok: false, raw, error: "Doesn't match vless://uuid@host:port shape." };
   }
 
   const uuid = decodeURIComponent(m[1]);
-  const host = m[2];
-  const port = parseInt(m[3], 10);
-  const query = new URLSearchParams(m[4] ? m[4].slice(1) : "");
-  const remarkRaw = m[5] ? decodeURIComponent(m[5].slice(1)) : "";
+  const host = m[2] || m[3];
+  const isIpv6Host = !!m[2];
+  const port = parseInt(m[4], 10);
+  const query = new URLSearchParams(m[5] ? m[5].slice(1) : "");
+  const remarkRaw = m[6] ? decodeURIComponent(m[6].slice(1)) : "";
   const tag = sanitizeTag(remarkRaw || `proxy-${index + 1}`, index);
 
   if (!UUID_RE.test(uuid)) {
     warnings.push(`UUID "${uuid}" doesn't look like a standard UUID — double check the link.`);
   }
   if (!port || port < 1 || port > 65535) {
-    warnings.push(`Port "${m[3]}" is out of range.`);
+    warnings.push(`Port "${m[4]}" is out of range.`);
   }
 
   const security = (query.get("security") || "none").toLowerCase();
@@ -319,6 +324,7 @@ function parseVlessLink(raw, index) {
     tag,
     name: remarkRaw || tag,
     host: outbound.server,
+    isIpv6Host,
     port,
     security,
     network,
@@ -334,6 +340,27 @@ function parseVlessLink(raw, index) {
 function toSingleAddressPrefix(cidr) {
   const addr = cidr.split("/")[0];
   return addr.includes(":") ? `${addr}/128` : `${addr}/32`;
+}
+
+// Loose CIDR sanity check (a.b.c.d/n or ipv6-addr/n) — just enough to catch
+// obviously malformed input (missing prefix, octets out of range, no slash
+// at all) before it silently flows into the TUN inbound and the self-loop
+// route rule.
+function isValidCidr(value) {
+  const v = (value || "").trim();
+  const slash = v.lastIndexOf("/");
+  if (slash === -1) return false;
+  const addr = v.slice(0, slash);
+  const prefix = v.slice(slash + 1);
+  if (!/^\d+$/.test(prefix)) return false;
+  const prefixNum = parseInt(prefix, 10);
+  if (addr.includes(":")) {
+    return prefixNum >= 0 && prefixNum <= 128 && /^[0-9a-f:]+$/i.test(addr);
+  }
+  const parts = addr.split(".");
+  if (parts.length !== 4) return false;
+  if (!parts.every(p => /^\d{1,3}$/.test(p) && parseInt(p, 10) <= 255)) return false;
+  return prefixNum >= 0 && prefixNum <= 32;
 }
 
 function sanitizeTag(name, index) {
@@ -770,9 +797,25 @@ function highlightJson(json) {
   );
 }
 
+// Node/test compatibility: exports the pure parsing/config-building
+// functions for `require()` in a test runner. No-op in the browser, where
+// `module` is undefined and this whole block is skipped.
+if (typeof module !== "undefined" && module.exports) {
+  module.exports = {
+    parseVlessLink, buildConfig, parseDnsAddress, parseBypassDomains,
+    parseBypassApps, toSingleAddressPrefix, sanitizeTag, isValidCidr,
+    highlightJson, V2RAYN_PREDEFINED_HOSTS, V2RAYN_DNS_PRESETS
+  };
+}
+
 // ============================================================
 // UI WIRING
 // ============================================================
+// Everything below touches the DOM directly at load time, so it's guarded
+// to skip cleanly when this file is `require()`d in Node (e.g. by
+// test/run.js) rather than loaded in a browser, where `document` is
+// always defined and this condition is always true.
+if (typeof document !== "undefined") {
 const els = {
   input: document.getElementById("vlessInput"),
   parseBtn: document.getElementById("parseBtn"),
@@ -1098,7 +1141,8 @@ function renderLinkResults(entries) {
         <span class="link-card-badge badge-err">error</span>`;
     } else {
       card.className = "link-card";
-      const detail = `${e.host}:${e.port} · ${e.security} · ${e.network}${e.warnings.length ? " · " + e.warnings.length + " warning(s)" : ""}`;
+      const hostDisplay = e.isIpv6Host ? `[${e.host}]` : e.host;
+      const detail = `${hostDisplay}:${e.port} · ${e.security} · ${e.network}${e.warnings.length ? " · " + e.warnings.length + " warning(s)" : ""}`;
       card.innerHTML = `
         <div class="link-card-main">
           <div class="link-card-name">${escapeHtml(e.name)}</div>
@@ -1163,6 +1207,18 @@ function regenerate() {
   if (opts.directDns === "custom" && !opts.directDnsCustom) {
     allWarnings.push("Direct resolver is set to \"Custom…\" but the field is empty — falling back to System default.");
   }
+  if (!isValidCidr(opts.tunAddr)) {
+    allWarnings.push(`TUN address "${opts.tunAddr}" doesn't look like a valid CIDR (e.g. 172.18.0.1/30) — kept as-is, sing-box will likely refuse to start with it.`);
+  }
+  if (opts.socksEnable && (opts.socksPort < 1 || opts.socksPort > 65535)) {
+    allWarnings.push(`SOCKS port ${opts.socksPort} is out of range (1–65535).`);
+  }
+  if (opts.clashApi && (opts.clashPort < 1 || opts.clashPort > 65535)) {
+    allWarnings.push(`Clash API port ${opts.clashPort} is out of range (1–65535).`);
+  }
+  if (opts.socksEnable && opts.clashApi && opts.socksPort === opts.clashPort) {
+    allWarnings.push(`SOCKS and Clash API are both set to port ${opts.socksPort} — sing-box will fail to bind one of them.`);
+  }
   const bypass = parseBypassDomains(optionEls.bypassDomains.value);
   bypass.warnings.forEach(w => allWarnings.push(w));
   opts.bypass = bypass;
@@ -1189,7 +1245,7 @@ function renderWarnings(list) {
   els.warnings.innerHTML = `<strong>heads up</strong><ul>${list.map(w => `<li>${escapeHtml(w)}</li>`).join("")}</ul>`;
 }
 
-els.parseBtn.addEventListener("click", () => {
+function runParse() {
   regenerate();
   const okCount = parsedOutbounds.filter(e => e.ok).length;
   const errCount = parsedOutbounds.filter(e => !e.ok).length;
@@ -1197,11 +1253,28 @@ els.parseBtn.addEventListener("click", () => {
     ? `${okCount} parsed${errCount ? `, ${errCount} failed` : ""}`
     : "";
   els.parseStatus.className = "parse-status " + (errCount ? "err" : (okCount ? "ok" : ""));
+}
+
+els.parseBtn.addEventListener("click", runParse);
+
+// Live-updates as you paste/type, matching every option field's own
+// behavior (and what the README promises) — debounced so a large
+// multi-line paste doesn't re-parse and re-highlight on every
+// intermediate keystroke.
+let inputDebounceTimer = null;
+els.input.addEventListener("input", () => {
+  clearTimeout(inputDebounceTimer);
+  inputDebounceTimer = setTimeout(runParse, 200);
 });
 
+const SAMPLE_LINK = "vless://d4b37f8e-d151-4baf-a38f-08553ad4430b@104.248.151.72:443?security=reality&type=tcp&flow=xtls-rprx-vision&pbk=2K_uxUIqAyf-Nrw4pFVIwCbXXjx25dLj6FqYohHJ3yk&sid=4268081ad76bb1f0&sni=i.ytimg.com&fp=chrome#Sample-Reality-Server";
 els.sampleBtn.addEventListener("click", () => {
-  els.input.value = "vless://d4b37f8e-d151-4baf-a38f-08553ad4430b@104.248.151.72:443?security=reality&type=tcp&flow=xtls-rprx-vision&pbk=2K_uxUIqAyf-Nrw4pFVIwCbXXjx25dLj6FqYohHJ3yk&sid=4268081ad76bb1f0&sni=i.ytimg.com&fp=chrome#Sample-Reality-Server";
-  regenerate();
+  const current = els.input.value.trim();
+  if (current && current !== SAMPLE_LINK) {
+    if (!confirm("This replaces the link(s) already in the box with the sample link. Continue?")) return;
+  }
+  els.input.value = SAMPLE_LINK;
+  runParse();
 });
 
 els.copyBtn.addEventListener("click", async () => {
@@ -1222,7 +1295,7 @@ els.downloadBtn.addEventListener("click", () => {
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
   a.href = url;
-  a.download = "config.json";
+  a.download = `config-${optionEls.platform.value || "sing-box"}.json`;
   document.body.appendChild(a);
   a.click();
   a.remove();
@@ -1281,3 +1354,4 @@ applyPlatformDefaults();
 
   render();
 })();
+} // end: if (typeof document !== "undefined")
