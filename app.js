@@ -159,7 +159,14 @@ function parseVlessLink(raw, index) {
   const host = m[2] || m[3];
   const isIpv6Host = !!m[2];
   const port = parseInt(m[4], 10);
-  const query = new URLSearchParams(m[5] ? m[5].slice(1) : "");
+  // URLSearchParams follows application/x-www-form-urlencoded rules, where
+  // a literal "+" decodes to a space — correct for form data, wrong for a
+  // URI query string (RFC 3986 has no such rule). Base64 values (ech=, and
+  // potentially others) commonly contain "+" and are often left
+  // unescaped by link generators since "+" needs no escaping in a general
+  // URI. Pre-escaping it to "%2B" makes it round-trip as a literal "+"
+  // either way, while leaving already-encoded "%2B" and "%20" untouched.
+  const query = new URLSearchParams(m[5] ? m[5].slice(1).replace(/\+/g, "%2B") : "");
   const remarkRaw = m[6] ? decodeURIComponent(m[6].slice(1)) : "";
   const tag = sanitizeTag(remarkRaw || `proxy-${index + 1}`, index);
 
@@ -229,14 +236,28 @@ function parseVlessLink(raw, index) {
     }
     const ehMatch = path.match(/[?&]eh=([^&]+)/);
     if (ehMatch) {
-      earlyDataHeaderName = decodeURIComponent(ehMatch[1]);
+      // ehMatch[1] is a substring of `path`, which URLSearchParams already
+      // decoded once when we called query.get("path") above — decoding it
+      // again here would be a double-decode bug (confirmed against
+      // v2rayN's own BaseFmt.cs fix for exactly this class of issue: a
+      // value that still looks like a valid percent-sequence after the
+      // first pass, e.g. a header name containing a literal "%41", would
+      // silently decay into "A" on a second pass).
+      earlyDataHeaderName = ehMatch[1];
       path = cleanupPath(path.replace(/[?&]eh=[^&]+/, ""));
     }
     const transport = { type: "ws", path };
     const hostHeader = query.get("host");
     if (hostHeader) { transport.headers = { Host: hostHeader }; transportHost = hostHeader; }
+    // v2rayN sets early_data_header_name whenever eh= matches, independent
+    // of whether ed= was also present — only max_early_data is gated on
+    // ed=. A bare eh= with no ed= is inert in sing-box (no early data is
+    // sent without max_early_data), but still reflects the link faithfully
+    // rather than silently dropping it.
     if (earlyData) {
       transport.max_early_data = earlyData;
+    }
+    if (earlyData || ehMatch) {
       transport.early_data_header_name = earlyDataHeaderName;
     }
     outbound.transport = transport;
@@ -580,7 +601,15 @@ function buildConfig(entries, opts) {
   const protectDomains = [...new Set(okEntries.map(e => e.host).filter(h => h && !isLiteralIp(h)))];
 
   const dnsRules = [
-    { server: "hosts_dns", ip_accept_any: true }
+    // sing-box 1.14.0 added preferred_by specifically for this case — "does
+    // this query match a domain the given server(s) actually hold a static
+    // answer for" — which is more precise than the ip_accept_any catch-all
+    // this used before (that unconditionally routed every address query
+    // through hosts_dns first, relying on it to "miss" gracefully).
+    // v2rayN's own SingboxDnsService.cs made the same switch. Requires
+    // sing-box >= 1.14.0 (see README's Sync notes for the compatibility
+    // trade-off).
+    { server: "hosts_dns", preferred_by: "hosts_dns" }
   ];
   if (protectDomains.length) {
     dnsRules.push({ server: "direct_dns", strategy, domain: protectDomains });
@@ -610,8 +639,11 @@ function buildConfig(entries, opts) {
   const dns = {
     servers: dnsServers,
     rules: dnsRules,
-    final: "remote_dns",
-    independent_cache: true
+    final: "remote_dns"
+    // independent_cache intentionally omitted: sing-box 1.14.0 deprecated
+    // it (the cache now always keys by transport) and it's scheduled for
+    // full removal in 1.16.0. v2rayN's own SingboxDnsService.cs dropped it
+    // the same way rather than waiting for the removal to force the issue.
   };
 
   // ---------- inbounds ----------

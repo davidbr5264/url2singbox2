@@ -101,6 +101,16 @@ test("ECH inline base64 config wraps into tls.ech", () => {
   assert.ok(e.outbound.tls.ech.config[0].includes("AEX+DQBBAAAgACC"));
 });
 
+test("unescaped '+' and '=' padding in a base64 query value survive intact (regression: form-encoding + vs. space)", () => {
+  // Many link generators don't bother percent-encoding "+"/"=" since
+  // neither needs escaping in a general URI — but URLSearchParams alone
+  // treats a literal "+" as a form-encoded space, which would silently
+  // corrupt a raw (unescaped) base64 ECH config containing one.
+  const link = "vless://d4b37f8e-d151-4baf-a38f-08553ad4430b@example.com:443?security=tls&sni=example.com&ech=AAj+DQAEAAAAAA==#RawPlus";
+  const e = parseVlessLink(link, 0);
+  assert.ok(e.outbound.tls.ech.config[0].includes("AAj+DQAEAAAAAA=="), `got: ${e.outbound.tls.ech.config[0]}`);
+});
+
 test("ECH with a DNS-reference (://) form is not silently mishandled", () => {
   const link = "vless://d4b37f8e-d151-4baf-a38f-08553ad4430b@example.com:443?security=tls&sni=example.com&ech=https%3A%2F%2Fexample.com%2Fech#Ech2";
   const e = parseVlessLink(link, 0);
@@ -128,6 +138,15 @@ test("ws transport reads both ed= and eh=, and strips both from path", () => {
   assert.equal(e.outbound.transport.path, "/path");
   assert.equal(e.outbound.transport.max_early_data, 2560);
   assert.equal(e.outbound.transport.early_data_header_name, "X-My-Header");
+});
+
+test("ws eh= header name is not double-decoded (regression: v2rayN BaseFmt.cs fix)", () => {
+  // %2541 in the raw URL decodes ONCE (via URLSearchParams) to a literal
+  // "%41" in the path; a second decodeURIComponent pass would corrupt it
+  // into "A". The header name must come out as the once-decoded value.
+  const link = "vless://d4b37f8e-d151-4baf-a38f-08553ad4430b@example.com:443?security=tls&type=ws&host=example.com&sni=example.com&path=%2Fws%3Feh%3DX-Header%2541#DoubleDecode";
+  const e = parseVlessLink(link, 0);
+  assert.equal(e.outbound.transport.early_data_header_name, "X-Header%41");
 });
 
 test("grpc transport reads serviceName", () => {
@@ -162,6 +181,21 @@ test("tls_record_fragment is never emitted (hardcoded off)", () => {
   const e = parseVlessLink("vless://d4b37f8e-d151-4baf-a38f-08553ad4430b@example.com:443?security=none#A", 0);
   const cfg = buildConfig([e], baseOpts());
   assert.ok(!cfg.route.rules.some(r => "tls_record_fragment" in r));
+});
+
+test("dns.independent_cache is not emitted (deprecated in sing-box 1.14.0, removed in 1.16.0)", () => {
+  const e = parseVlessLink("vless://d4b37f8e-d151-4baf-a38f-08553ad4430b@example.com:443?security=none#A", 0);
+  const cfg = buildConfig([e], baseOpts());
+  assert.ok(!("independent_cache" in cfg.dns));
+});
+
+test("hosts_dns catch-all rule uses preferred_by, not the older ip_accept_any", () => {
+  const e = parseVlessLink("vless://d4b37f8e-d151-4baf-a38f-08553ad4430b@example.com:443?security=none#A", 0);
+  const cfg = buildConfig([e], baseOpts());
+  const hostsRule = cfg.dns.rules.find(r => r.server === "hosts_dns");
+  assert.ok(hostsRule, "expected a hosts_dns dns rule");
+  assert.equal(hostsRule.preferred_by, "hosts_dns");
+  assert.ok(!("ip_accept_any" in hostsRule));
 });
 
 test("protect-domain DNS rule is added for a domain host, not for an IP host", () => {

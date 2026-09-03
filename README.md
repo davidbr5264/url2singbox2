@@ -143,6 +143,62 @@ Confirmed unchanged and still accurate: the `V2RAYN_PREDEFINED_HOSTS`
 table (byte-for-byte against `Global.PredefinedHosts`), the DNS preset
 address lists, and the flow/vision normalization.
 
+### Second pass
+
+Re-diffed the same files (plus `CoreConfigContextBuilder.cs`, `BaseFmt.cs`,
+`Utils.cs`, `ConfigItems.cs`) against a fresh clone of `master`.
+`SingboxOutboundService.cs` and `SingboxRoutingService.cs` came back with
+zero functional diff — the VLESS/TLS/Reality/transport logic and the
+route-rule shapes this tool ported are still current. What did change:
+
+- **`dns.independent_cache` is no longer emitted.** sing-box 1.14.0
+  deprecated it (the cache now always keys by transport) and it's
+  scheduled for full removal in 1.16.0 — confirmed directly against
+  sing-box's own release notes and changelog, not just v2rayN's diff.
+  v2rayN's `SingboxDnsService.cs` dropped it the same way rather than
+  waiting for the removal to force the issue; this tool now does too.
+- **The hosts-server catch-all DNS rule switched from `ip_accept_any` to
+  `preferred_by`.** sing-box 1.14.0 added `preferred_by` specifically for
+  "does this query match a domain the given server(s) hold a static
+  answer for," which is more precise than unconditionally routing every
+  address query through `hosts_dns` first and relying on it to miss
+  gracefully. v2rayN made the same switch. **Trade-off worth knowing**:
+  this requires sing-box ≥ 1.14.0, unlike `ip_accept_any` which still
+  works on older versions too — if you need to support an older sing-box
+  install, change this one rule back.
+- **Fixed a double-decode bug in the WebSocket `eh=` (early-data header
+  name) parameter.** `eh=`'s value is a substring of the already-decoded
+  `path` (from `URLSearchParams`), so decoding it a second time could
+  corrupt a header name that still looked like a valid percent-sequence
+  after the first pass — e.g. `%2541` → (correctly) `%41` → (bug)
+  `A`. Found by checking v2rayN's own fix for the identical bug class in
+  `BaseFmt.cs`'s `GetQueryDecoded()`, then confirming this tool's separate
+  `eh=`-specific decode had the same issue. Also fixed in passing: `eh=`
+  now sets the header name even without `ed=` present too (matching
+  v2rayN — only `max_early_data` is gated on `ed=`; the header name isn't).
+- **Fixed a `+`-as-space bug of this tool's own** (not present in v2rayN's
+  C#, which doesn't use `URLSearchParams`): base64 values like `ech=`
+  commonly contain `+` and are often left unescaped by link generators
+  since `+` needs no percent-encoding in a general URI — but
+  `URLSearchParams` follows `application/x-www-form-urlencoded` rules,
+  where a literal `+` decodes to a space. An unescaped `ech=AAj+DQ...`
+  was silently corrupted. Fixed by pre-escaping `+` to `%2B` before
+  parsing. v2rayN's own test suite gained coverage for an analogous (but
+  distinct) query-parsing edge case this pass — that's what prompted
+  checking for this one.
+- **Not portable, confirmed architecturally out of scope**: v2rayN added
+  `Utils.HasGlobalIPv6Address()` (a native network-interface probe used to
+  decide some IPv6-related default). A browser sandbox has no equivalent
+  API — a page can't enumerate the machine's network interfaces — so
+  there's no way to port this short of asking the person directly, which
+  isn't worth a UI field for what's a minor default.
+- **New DNS features from this pass not implemented**: multiple
+  comma/semicolon-separated remote/direct DNS servers with parallel or
+  serial query racing, and `ServeStale`/`dns.optimistic`. Both are part of
+  v2rayN's advanced multi-server DNS mode; this tool's DNS step
+  intentionally stays single-server-per-role, matching the "simple mode"
+  v2rayN itself defaults to.
+
 ## What it builds
 
 - **TUN inbound** (`strict_route`, `gvisor` stack by default) + optional local
