@@ -278,6 +278,15 @@ test("bypass domains: bare domain, subdomain-only, keyword, regex", () => {
   assert.ok(r.domain_regex.includes("^ads\\."));
 });
 
+test("bypass keyword is a raw substring, not run through hostname cleanup (regression)", () => {
+  // A keyword isn't a hostname — it must not get port/path/query stripping
+  // applied to it just because it happens to contain ":digits", "/", or "?".
+  const r = parseBypassDomains("keyword:node:1\nkeyword:video?\nkeyword:a/b");
+  assert.ok(r.domain_keyword.includes("node:1"), `expected "node:1", got: ${JSON.stringify(r.domain_keyword)}`);
+  assert.ok(r.domain_keyword.includes("video?"), `expected "video?", got: ${JSON.stringify(r.domain_keyword)}`);
+  assert.ok(r.domain_keyword.includes("a/b"), `expected "a/b", got: ${JSON.stringify(r.domain_keyword)}`);
+});
+
 test("bypass domains: invalid regex is skipped with a warning, not thrown", () => {
   const r = parseBypassDomains("regex:(unterminated");
   assert.equal(r.domain_regex.length, 0);

@@ -429,7 +429,14 @@ function parseBypassDomains(text) {
     }
 
     if (line.toLowerCase().startsWith("keyword:")) {
-      const kw = normalizeHost(line.slice(8));
+      // Deliberately NOT normalizeHost() here: a keyword is an arbitrary
+      // substring to search for, not a hostname — running it through
+      // hostname cleanup would silently mangle a keyword that happens to
+      // contain a colon+digits, a slash, or a "?" (e.g. "node:1" -> "node",
+      // "video?" -> "video"), since normalizeHost strips those thinking
+      // they're a port/path/query. Just trim and lowercase for
+      // case-insensitive matching against the (lowercase) sniffed name.
+      const kw = line.slice(8).trim().toLowerCase();
       if (kw) domain_keyword.push(kw); else warnings.push("Empty keyword rule — skipped.");
       return;
     }

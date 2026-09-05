@@ -72,7 +72,7 @@
   </nav>
 
   <div class="utility-row">
-    <span id="settingsStatus" class="parse-status"></span>
+    <span id="settingsStatus" class="parse-status" role="status" aria-live="polite"></span>
     <button id="resetOptionsBtn" class="btn btn-ghost btn-sm" type="button">reset to defaults</button>
   </div>
 
@@ -91,7 +91,7 @@
       <div class="input-row">
         <button id="parseBtn" class="btn btn-primary">parse links</button>
         <button id="sampleBtn" class="btn btn-ghost">load sample</button>
-        <span id="parseStatus" class="parse-status"></span>
+        <span id="parseStatus" class="parse-status" role="status" aria-live="polite"></span>
       </div>
 
       <div id="linkResults" class="link-results" aria-live="polite"></div>
@@ -366,7 +366,7 @@
         </div>
       </div>
 
-      <div id="warnings" class="warnings" hidden></div>
+      <div id="warnings" class="warnings" role="status" aria-live="polite" hidden></div>
 
       <pre id="output" class="output-code"><code id="outputCode">// finish step 1 to generate a config here</code></pre>
 
